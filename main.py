@@ -1,4 +1,5 @@
-from sqlalchemy import create_engine, Column, Integer, String, Date
+import enum
+from sqlalchemy import create_engine, Column, Integer, String, Date, Enum
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from fastapi import FastAPI, HTTPException, Depends
 
@@ -9,6 +10,13 @@ localsession = sessionmaker(bind=engine, autoflush=False)
 base = declarative_base()
 
 
+class catstatus(enum.Enum):
+    HEALTHY = "healthy"
+    SICK = "sick"
+    RECOVERING = "recovering"
+    ADOPTED = "adopted"
+
+
 class cat(base):
     __tablename__ = "cats_entries"
 
@@ -16,6 +24,7 @@ class cat(base):
     Name = Column(String)
     DOB = Column(Date)
     Issue = Column(String)
+    Status = Column(Enum(catstatus))
 
 
 base.metadata.create_all(bind=engine)
