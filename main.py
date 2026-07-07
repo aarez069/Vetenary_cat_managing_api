@@ -20,6 +20,11 @@ class catstatus(enum.StrEnum):
     ADOPTED = "adopted"
 
 
+class catgender(enum.StrEnum):
+    MALE = "male"
+    FEMALE = "female"
+
+
 class cat(base):
     __tablename__ = "cats_entries"
 
@@ -28,6 +33,7 @@ class cat(base):
     DOB = Column(Date)
     Issue = Column(String)
     Status = Column(Enum(catstatus))
+    Gender = Column(Enum(catgender))
 
 
 class getcat(BaseModel):
@@ -49,6 +55,19 @@ class getcat(BaseModel):
         Literal["HEALTHY", "SICK", "RECOVERING", "ADOPTED"],
         Field(..., description="Choose from HEALTY,SICK,RECOVERING,ADOPTED"),
     ]
+    Gender: Annotated[
+        Literal["MALE", "FEMALE"], Field(..., description="Choose from Male or Female")
+    ]
+
+    @field_validator("Status", mode="before")
+    @classmethod
+    def uppercase_status(cls, v: str) -> str:
+        return v.upper()
+
+    @field_validator("Gender", mode="before")
+    @classmethod
+    def gender_status(cls, v: str) -> str:
+        return v.upper()
 
 
 class fetchcat(BaseModel):
@@ -71,11 +90,22 @@ class fetchcat(BaseModel):
         Optional[Literal["HEALTHY", "SICK", "RECOVERING", "ADOPTED"]],
         Field(description="Choose from HEALTY,SICK,RECOVERING,ADOPTED", default=None),
     ]
+    Gender: Annotated[
+        Optional[Literal["MALE", "FEMALE"]],
+        Field(description="Choose from Male or Female", default=None),
+    ]
 
     @field_validator("Status", mode="before")
     @classmethod
     def lowercase_status(cls, v: str) -> str:
         if v is None:
+            return None
+        return v.upper()
+
+    @field_validator("Gender", mode="before")
+    @classmethod
+    def gender_status(cls, v: str) -> str:
+        if not v:
             return None
         return v.upper()
 
@@ -129,3 +159,13 @@ def view_specific(
     if not data:
         raise HTTPException(status_code=404, detail="No such entry found !!!")
     return {"message": "The cats that match your criterion are these:", "Cats": data}
+
+
+@app.put("/update/{cat_id}")
+def update_cat(cat_id: int, cat_updated_details: fetchcat, db: Session = Depends(pre)):
+    new_details = cat_updated_details.model_dump(exclude_unset=True)
+    subject = db.query(cat).filter(cat.ID == cat_id).first()
+    for key, value in new_details.items():
+        setattr(subject, key, value)
+    db.commit()
+    return {"meaasge": "The provided data has been updated successfully!!!"}
