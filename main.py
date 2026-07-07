@@ -1,8 +1,8 @@
 import enum
 from sqlalchemy import create_engine, Column, Integer, String, Date, Enum
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
-from fastapi import FastAPI, HTTPException, Depends
-from typing import Annotated, Literal
+from fastapi import FastAPI, HTTPException, Depends, Query
+from typing import Annotated, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 from datetime import date
 
@@ -13,7 +13,7 @@ localsession = sessionmaker(bind=engine, autoflush=False)
 base = declarative_base()
 
 
-class catstatus(enum.Enum):
+class catstatus(enum.StrEnum):
     HEALTHY = "healthy"
     SICK = "sick"
     RECOVERING = "recovering"
@@ -50,9 +50,33 @@ class getcat(BaseModel):
         Field(..., description="Choose from HEALTY,SICK,RECOVERING,ADOPTED"),
     ]
 
+
+class fetchcat(BaseModel):
+    Name: Annotated[
+        Optional[str],
+        Field(description="Enter the Cat's name", default=None),
+    ]
+    DOB: Annotated[
+        Optional[date],
+        Field(description="Enter date in YYYY-MM-DD format", default=None),
+    ]
+    Issue: Annotated[
+        Optional[str],
+        Field(
+            description="Enter the disease or problem the cat is suffering from",
+            default=None,
+        ),
+    ]
+    Status: Annotated[
+        Optional[Literal["HEALTHY", "SICK", "RECOVERING", "ADOPTED"]],
+        Field(description="Choose from HEALTY,SICK,RECOVERING,ADOPTED", default=None),
+    ]
+
     @field_validator("Status", mode="before")
     @classmethod
     def lowercase_status(cls, v: str) -> str:
+        if v is None:
+            return None
         return v.upper()
 
 
@@ -79,3 +103,29 @@ def add(new_cat: getcat, db: Session = Depends(pre)):
     db.commit()
     db.refresh(new_cat)
     return {"message": "The cat has been added to your database", "entry": new_cat}
+
+
+@app.get("/view")
+def view_data(db: Session = Depends(pre)):
+    data = db.query(cat).all()
+    if not data:
+        raise HTTPException(status_code=404, detail="No entries yet!!!")
+    return data
+
+
+@app.get("/view/specific")
+def view_specific(
+    cat_specific: fetchcat = Query(
+        description="Enter the required fields you wish to search"
+    ),
+    db: Session = Depends(pre),
+):
+    query = db.query(cat)
+    to_search = cat_specific.model_dump(exclude_unset=True)
+    for key, value in to_search.items():
+        if value is not None:
+            query = query.filter(getattr(cat, key) == value)
+    data = query.all()
+    if not data:
+        raise HTTPException(status_code=404, detail="No such entry found !!!")
+    return {"message": "The cats that match your criterion are these:", "Cats": data}
