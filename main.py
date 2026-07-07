@@ -169,3 +169,13 @@ def update_cat(cat_id: int, cat_updated_details: fetchcat, db: Session = Depends
         setattr(subject, key, value)
     db.commit()
     return {"meaasge": "The provided data has been updated successfully!!!"}
+
+
+@app.delete("/delete/{cat_id}")
+def delete_cat(cat_id: int, db: Session = Depends(pre)):
+    cat_subject = db.query(cat).filter(cat.ID == cat_id).first()
+    if not cat_subject:
+        raise HTTPException(status_code=404, detail="No such entry found!!!")
+    db.delete(cat_subject)
+    db.commit()
+    return {"message": "The entry has been deleted!!!"}
