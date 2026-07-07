@@ -165,6 +165,8 @@ def view_specific(
 def update_cat(cat_id: int, cat_updated_details: fetchcat, db: Session = Depends(pre)):
     new_details = cat_updated_details.model_dump(exclude_unset=True)
     subject = db.query(cat).filter(cat.ID == cat_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="No such entry found !!!")
     for key, value in new_details.items():
         setattr(subject, key, value)
     db.commit()
