@@ -110,9 +110,6 @@ class fetchcat(BaseModel):
         return v.upper()
 
 
-base.metadata.create_all(bind=engine)
-
-
 def pre():
     db = localsession()
     try:
