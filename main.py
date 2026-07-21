@@ -167,7 +167,11 @@ def update_cat(cat_id: int, cat_updated_details: fetchcat, db: Session = Depends
     for key, value in new_details.items():
         setattr(subject, key, value)
     db.commit()
-    return {"meaasge": "The provided data has been updated successfully!!!"}
+    data = db.query(cat).filter(cat.ID == cat_id).all()
+    return {
+        "message": "The provided data has been updated successfully!!!",
+        "Updated Entry": data,
+    }
 
 
 @app.delete("/delete/{cat_id}")
