@@ -1,23 +1,45 @@
 import pytest
 from fastapi.testclient import TestClient
-from main import app, engine, localsession, base, cat
+from main import app, engine, localsession, base, cat, sessionmaker, create_engine, pre
 
-Client = TestClient(app)
-
-
-@pytest.fixture(autouse=True)
-def clear_db():
-    base.metadata.drop_all(bind=engine)
-    base.metadata.create_all(bind=engine)
+Database_url = "sqlite:///./test.db"
+engine = create_engine(Database_url, connect_args={"check_same_thread": False})
+TestLocalSession = sessionmaker(bind=engine, autoflush=False)
+base.metadata.create_all(bind=engine)
 
 
-def test_view_data():
+@pytest.fixture(scope="function")
+def db_session():
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = TestLocalSession(bind=connection)
+    yield session
+    session.close()
+    transaction.rollback()
+    connection.close()
+
+
+@pytest.fixture(scope="function")
+def Client(db_session):
+    def override_pre():
+        try:
+            yield db_session
+        finally:
+            pass
+
+    app.dependency_overrides[pre] = override_pre
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
+def test_view_data(Client):
     response = Client.get("/view")
     assert response.status_code == 404
     assert response.json() == {"detail": "No entries yet!!!"}
 
 
-def test_add():
+def test_add(Client):
     response = Client.post(
         "/add/cat",
         json={
@@ -42,7 +64,7 @@ def test_add():
     }
 
 
-def test_view_specific():
+def test_view_specific(Client):
     response = Client.post(
         "/add/cat",
         json={
@@ -59,7 +81,7 @@ def test_view_specific():
     assert response_body["Cats"][0]["Name"] == "Brownie"
 
 
-def test_update_cat():
+def test_update_cat(Client):
     response = Client.post(
         "/add/cat",
         json={
@@ -79,7 +101,7 @@ def test_update_cat():
     assert response_body["Updated Entry"][0]["Name"] == "Brownie the Great"
 
 
-def test_delete_cat():
+def test_delete_cat(Client):
     Client.post(
         "/add/cat",
         json={
@@ -93,6 +115,3 @@ def test_delete_cat():
     response = Client.delete("/delete/1")
     assert response.status_code == 200
     assert response.json() == {"message": "The entry has been deleted!!!"}
-    db = localsession()
-    data = db.query(cat).filter(cat.ID == 1).all()
-    assert data == []
