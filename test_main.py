@@ -56,11 +56,7 @@ def test_view_specific():
     response = Client.get("/view/specific", params={"Name": "Brownie"})
     assert response.status_code == 200
     response_body = response.json()
-    if len(response_body["Cats"]) != 0:
-        for i in response_body["Cats"]:
-            assert i["Name"] == "Brownie"
-    else:
-        pass
+    assert response_body["Cats"][0]["Name"] == "Brownie"
 
 
 def test_update_cat():
